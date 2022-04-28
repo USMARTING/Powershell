@@ -1,0 +1,9 @@
+TrayTip Script, Looking for Reminder window to put on top, , 16
+SetTitleMatchMode  2 ; windows contains
+loop {
+  WinWait, Reminder(s), 
+  WinSet, AlwaysOnTop, on, Reminder(s)
+  WinActivate, Reminder(s)
+  TrayTip Outlook Reminder, You have an outlook reminder open, , 16
+  WinWaitClose, Reminder(s), ,30
+}
