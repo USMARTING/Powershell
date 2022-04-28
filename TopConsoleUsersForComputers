@@ -1,0 +1,25 @@
+[CmdletBinding()]
+param (
+    [Parameter(Mandatory=$true)]
+    [ValidateScript({$_.gettype().BaseType.Name -eq "Array" -and $_.Count -gt 0})]
+    [string[]]
+    $ComputerNames = @()
+)
+
+$ComputerNames = $ComputerNames | Foreach {$_.ToLower()}
+
+$TCUData = Invoke-CMQuery -Name "PS-TopConsoleUserWithResourceID" -LimitToCollectionId "COLLECTIONID"
+$Result = @()
+ForEach ($System in $TCUData) {
+
+    If ($System.SMS_R_System.Name.ToLower() -in $ComputerNames) {
+        
+        $Result += $System.SMS_G_System_SYSTEM_CONSOLE_USAGE | Select -ExpandProperty TopConsoleUser | ForEach {$_}
+
+    }
+
+}
+
+$Result = $Result | Select -unique
+
+$Result
