@@ -1,0 +1,1 @@
+get-cmcollection | ? {$_.RefreshSchedule.Hourspan -eq 1 -and $_.RefreshType -in @(2,6)}
