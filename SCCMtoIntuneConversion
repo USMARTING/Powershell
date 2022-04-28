@@ -1,0 +1,35 @@
+$PackageSourceFolderPath = "\\path\path"
+$PackageSetupFile = "Deploy-Application.exe"
+$OutputFolderPath = "C:\IntuneWinFiles\path"
+$IntuneWinAppUtilPath = "C:\IntuneWinFiles\IntuneWinAppUtil.exe"
+$TenantName = "FQDN"
+
+if ($(test-path $OutputFolderPath -PathType Container) -eq $false) {New-Item -Path $OutputFolderPath -Force -ItemType Directory}
+
+Connect-MSIntuneGraph -TenantName $TenantName -PromptBehavior Always
+$IntuneWinFileData = New-IntuneWin32AppPackage -SourceFolder $PackageSourceFolderPath -SetupFile $PackageSetupFile -OutputFolder $OutputFolderPath -IntuneWinAppUtilPath $IntuneWinAppUtilPath
+
+# Get MSI meta data from .intunewin file
+$IntuneWinFile = $IntuneWinFileData.Path
+$IntuneWinMetaData = Get-IntuneWin32AppMetaData -FilePath $IntuneWinFile
+
+# Create custom display name like 'Name' and 'Version'
+$DisplayName = $IntuneWinMetaData.ApplicationInfo.Name + " " + $IntuneWinMetaData.ApplicationInfo.MsiInfo.MsiProductVersion
+$Publisher = $IntuneWinMetaData.ApplicationInfo.MsiInfo.MsiPublisher
+
+if ($Publisher -eq $null) {$Publisher = "N/A"}
+
+$DetectionRuleType = "File-VersionValue"
+
+# Create MSI detection rule
+if ($DetectionRuleType = "File-VersionValue") {
+    $VersionValue = "6.23.13702.0"
+    $Path = "C:\Program Files\CrowdStrike"
+    $FileOrFolder = "CSFalconService.exe"
+    $Operator = "greaterThanOrEqual"
+    $DetectionRule = New-IntuneWin32AppDetectionRuleFile -Version -VersionValue $VersionValue -Path $Path -FileOrFolder $FileOrFolder -Operator $Operator
+
+}
+
+# Add new MSI Win32 app
+Add-IntuneWin32App -FilePath $IntuneWinFile -DisplayName $DisplayName -Description "SCCM App to Intune Conversion" -Publisher $Publisher -InstallExperience system -RestartBehavior suppress -DetectionRule $DetectionRule -InstallCommandLine "Deploy-Application.exe" -UninstallCommandLine "Deploy-Application.exe Uninstall" -Verbose
