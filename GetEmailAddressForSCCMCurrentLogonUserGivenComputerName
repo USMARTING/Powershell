@@ -1,0 +1,3 @@
+$Addys = @("ComputerName") | foreach { get-cmdevice -Name $_ | ? {$_.CurrentLogonUser -ne $null} | select @{n="UserID";e={$_.CurrentLogonUser.split("\")[1]}} | Select -ExpandProperty UserId | ? {$_ -ne $null} | Get-ADUser -Properties mail | ? {$_.Mail -ne $null} | select -ExpandProperty mail}
+
+$Addys2 = $Addys | select mail -unique
