@@ -33,3 +33,131 @@ if ($DetectionRuleType = "File-VersionValue") {
 
 # Add new MSI Win32 app
 Add-IntuneWin32App -FilePath $IntuneWinFile -DisplayName $DisplayName -Description "SCCM App to Intune Conversion" -Publisher $Publisher -InstallExperience system -RestartBehavior suppress -DetectionRule $DetectionRule -InstallCommandLine "Deploy-Application.exe" -UninstallCommandLine "Deploy-Application.exe Uninstall" -Verbose
+
+
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope CurrentUser -Force
+
+ #Copy and paste your app names from excel:
+ $AppNames = @("AppName","AppName")
+
+ 
+
+$SaveIntuneWinFilesHere = "$($ENV:USERPROFILE)\Desktop\IntuneWinFiles"
+
+ 
+
+New-Item -Path $SaveIntuneWinFilesHere -Force -ItemType Directory
+
+ 
+
+Invoke-WebRequest -Uri "https://github.com/microsoft/Microsoft-Win32-Content-Prep-Tool/raw/master/IntuneWinAppUtil.exe" -Method Get -OutFile  "$($SaveIntuneWinFilesHere)\IntuneWinAppUtil.exe"
+
+ 
+
+function Get-CMApplicationCommands
+{
+[CmdletBinding()]
+[Alias()]
+[OutputType([int])]
+Param
+(
+    # Param1 help description
+    [Parameter(Mandatory=$true,
+                ValueFromPipelineByPropertyName=$true,
+                Position=0)]
+    $Application
+
+ 
+
+)
+
+ 
+
+    $appXML = Get-CMApplication -Name $Application | Select-Object -ExpandProperty SDMPackageXML
+    $appProperties = [Microsoft.ConfigurationManagement.ApplicationManagement.Serialization.SccmSerializer]::DeserializeFromString($appXML)
+    $itemobj = New-Object pscustomobject
+    $itemobj | Add-Member NoteProperty -Name AppName -Value ($Application)
+    $itemobj | Add-Member NoteProperty -Name AppSourcePath -Value (([XML](Get-CMApplication -Name $Application | Select-Object -ExpandProperty SDMPackageXML)).AppMgmtDigest | Select -ExpandProperty DeploymentType | Select -ExpandProperty Installer | Select -ExpandProperty Contents | Select -ExpandProperty Content | Select -ExpandProperty Location)
+    $itemobj | Add-Member NoteProperty -Name Install -Value ($appProperties.DeploymentTypes.Installer.InstallCommandLine)
+    $itemobj | Add-Member NoteProperty -Name Uninstall -Value ($appProperties.DeploymentTypes.Installer.UninstallCommandLine)
+    #$appXML.AppMgmtDigest | select -ExpandProperty DeploymentType
+    #$appProperties.DeploymentType.Installer.UninstallCommandLine
+    $itemobj
+
+ 
+
+}
+
+ 
+
+#make sure you copy IntuneWinAppUtil.exe to the Save Intune Win Files Here directory, and are already connected to TP1:
+If (Test-Path "$($SaveIntuneWinFilesHere)\IntuneWinAppUtil.exe") {
+
+ 
+
+    set-location tp1:
+    $Apps = ($AppNamesFromExcelDoc | foreach { Get-CMApplicationCommands -Application $_ -ErrorAction SilentlyContinue})
+    $Apps = $Apps | ? {$_.AppSourcePath -ne $Null -and $_.Install -ne $null} 
+
+ 
+
+    Foreach ($App in $apps) {
+    Write-Host "Processing: $($App.AppName)"
+            [String]$SourceFolder = "IntuneAppSourceFolder:"
+            [String]$SetupFile = $app.Install
+            [String]$OutPutFolder = "$SaveIntuneWinFilesHere\$($App.AppName)"
+
+ 
+
+        Remove-PSDrive -Name "IntuneAppSourceFolder" -Force -ErrorAction SilentlyContinue
+        new-psdrive -Name "IntuneAppSourceFolder" -PSProvider FileSystem -Root $App.AppSourcePath
+        Set-Location "IntuneAppSourceFolder:"
+
+ 
+
+        If ( -not (test-path -Path $SourceFolder)){
+            throw "Cannot find sourcefolder: [$SourceFolder]"
+            return
+        }
+
+ 
+
+        If ( -not (test-path -Path "$SourceFolder\$SetupFile")){
+            throw "Cannot find setupfile: [$SetupFile]"
+            return
+        }
+
+ 
+
+        If ( -not (test-path -Path $OutPutFolder\SourceFiles)){
+            New-Item -Path $OutPutFolder\SourceFiles -ItemType Directory -Force | Out-Null
+        }
+
+ 
+
+        If (-not (test-path -Path "$SaveIntuneWinFilesHere\IntuneWinAppUtil.exe")){
+            throw "Cannot find IntuneWinAppUtil.exe at: [$PSScriptRoot]"
+            return
+        }
+        Write-Host "Processing: $($App.AppName) - Copying Source Files"
+        copy-item "$SourceFolder\*" "$OutPutFolder\SourceFiles\" -Recurse -Verbose -Force
+
+        #Create Setup File:
+        "$($App.Install)" | out-file -FilePath "$OutPutFolder\SourceFiles\$($app.AppName.Replace(' ','_'))-IntuneWin32AppInstall.cmd" -Force
+
+        Start-Process -FilePath "$SaveIntuneWinFilesHere\IntuneWinAppUtil.exe" -ArgumentList "-c `"$OutPutFolder\SourceFiles`" -s `"$($app.AppName.Replace(' ','_'))-IntuneWin32AppInstall.cmd`" -o `"$OutPutFolder`" -q" -Wait -WorkingDirectory "$SaveIntuneWinFilesHere"
+
+         $intunewinfile = $("$($app.AppName.Replace(' ','_'))-IntuneWin32AppInstall.intunewin")
+
+ 
+
+        If ( Test-Path -Path "$OutPutFolder\$intunewinfile" ) {
+            Write-output -InputObject "[$intunewinfile] file succesfully created"
+        } else {
+            throw "File [$intunewinfile] not created"
+            return
+        }
+    }
+} ELSE {
+    "Path not exist"
+}
