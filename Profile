@@ -1,0 +1,67 @@
+if ($env:TERM_PROGRAM) {
+
+    return
+
+}
+# Import modules
+#Import-Module -Name posh-git
+#Import-Module core
+#Import-Module ImportExcel
+#Import-Module newtonsoft.json
+Import-Module PowerTab -ArgumentList "PowerTabConfig.xml" | Out-Null
+#Import-Module pswmitoolkit
+#Import-Module ThreadJob
+
+Import-Module "Scripts\Utils\UtilityFunctions.ps1"
+
+if ($host.Name -eq 'ConsoleHost')
+{
+    Import-Module PSReadLine
+}
+
+$null = New-Item 'HKCU:\Console\%SystemRoot%_System32_WindowsPowerShell_v1.0_powershell.exe' -Force -ErrorAction SilentlyContinue
+
+$null = New-ItemProperty -path 'HKCU:\Console\%SystemRoot%_System32_WindowsPowerShell_v1.0_powershell.exe' -Name FaceName -PropertyType STRING -value "Lucida Console" -Force -ErrorAction SilentlyContinue
+$null = New-ItemProperty -path 'HKCU:\Console\%SystemRoot%_System32_WindowsPowerShell_v1.0_powershell.exe' -Name FontFamily -PropertyType DWORD -value 0x00000000 -Force -ErrorAction SilentlyContinue
+$null = New-ItemProperty -path 'HKCU:\Console\%SystemRoot%_System32_WindowsPowerShell_v1.0_powershell.exe' -Name FontSize -PropertyType DWORD -value 0x00100000 -force -ErrorAction SilentlyContinue
+$null = New-ItemProperty -path 'HKCU:\Console\%SystemRoot%_System32_WindowsPowerShell_v1.0_powershell.exe' -Name FontWeight -PropertyType DWORD -value 0x00000000 -force -ErrorAction SilentlyContinue
+
+#Helper Functions
+
+function global:prompt
+{
+    # New line
+    Write-Host ""
+    $PromptString = "$(Get-Date -Format "yyyyMMdd:hhmmss.fffzzz") "
+    Write-Host "[$(Get-Date -UFormat '%T')] " -ForegroundColor White -BackgroundColor Red -NoNewline
+    $PromptString = $PromptString + "$([char]0x25ba)"
+    Write-Host "$([char]0x25ba)" -ForegroundColor Red -BackgroundColor DarkCyan -NoNewline
+    $PromptString = $PromptString + " ($ENV:USERNAME@$ENV:COMPUTERNAME) "
+    Write-Host " ($ENV:USERNAME@$ENV:COMPUTERNAME) " -ForegroundColor White -BackgroundColor DarkCyan -NoNewline
+    $PromptString = $PromptString + "$([char]0x25ba)"
+    Write-Host "$([char]0x25ba)" -ForegroundColor DarkCyan -BackgroundColor Yellow -NoNewline
+
+    # show the drive and then last 2 directories of current path
+    if (($pwd.Path.Split('\').count -gt 4)){
+        $PromptString = $PromptString + " $($pwd.path.split('\')[0], '...', $pwd.path.split('\')[-3], $pwd.path.split('\')[-1] -join ('\'))"
+        write-host " $($pwd.path.split('\')[0], '...', $pwd.path.split('\')[-3], $pwd.path.split('\')[-1] -join ('\'))"  -ForegroundColor Black -BackgroundColor Yellow -NoNewline
+    }
+    else{
+        $PromptString = $PromptString + " $($pwd.path)"
+        Write-Host " $($pwd.path)" -ForegroundColor Black -BackgroundColor Yellow -NoNewline
+    }
+    $Spaces = $PromptString
+    $Spaces = $Spaces.PadRight($Host.UI.RawUI.WindowSize.Width, " ").Replace($PromptString,"")
+    Write-Host $Spaces -ForegroundColor Black -BackgroundColor Yellow 
+    "$([char]0x25ba) "
+}
+
+Function Get-ConsoleHostPid {
+    Foreach($p in (Get-Process PowerShell))  {
+        if ($p.StartTime.Touniversaltime() -match (Get-Date).ToUniversalTime()) { 
+            $host | Add-Member -NotePropertyName PID -NotePropertyValue ($p.ID) 
+        }
+    }
+}
+
+Start-Transcript -Path "Scripts\Transcripts\$(Get-Date -format 'yyyyMMddHHmmssffff') - $((Get-ConsoleHostPid).PID).log"
