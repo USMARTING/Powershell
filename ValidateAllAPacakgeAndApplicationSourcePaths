@@ -1,0 +1,11 @@
+$AllPackagesResult = Get-CMPackage -fast | ConvertTo-CSV | ConvertFrom-CSV | Select @{n="ObjectType";e={"Package"}}, @{n="ID";e={$_.PackageID}}, Name, @{N="ContentSourcePath";e={$_.PkgSourcePath}}, @{n="PathIsValid";e={(-not ([string]::IsNullOrEmpty($_.PkgSourcePath))) -and $_.PkgSourcePath -like "\\*"}}
+$AllPackagesResult = $AllPackagesResult | Select *, @{n="PathExists";e={if ($_.PathIsValid) {test-path $_.ContentSourcePath}}}
+
+$AllDeploymentTypesResult = Get-CMApplication | Get-CMDeploymentType | Select @{n="ObjectType";e={"DeploymentType"}}, @{n="ID";e={$_.CI_ID}}, @{n="Name";e={$_.LocalizedDisplayName}}, @{N="ContentSourcePath";e={([xml]$_.SDMPackageXML).AppMgmtDigest.DeploymentType.Installer.Contents.Content.Location}}
+$AllDeploymentTypesResult = $AllDeploymentTypesResult | ConvertTo-CSV | ConvertFrom-CSV | Select *, @{n="PathIsValid";e={(-not ([string]::IsNullOrEmpty($_.ContentSourcePath))) -and $_.ContentSourcePath -like "\\*"}}
+$AllDeploymentTypesResult = $AllDeploymentTypesResult | Select *, @{n="PathExists";e={if ($_.PathIsValid) {test-path $_.ContentSourcePath}}}
+
+$AllObjects = $AllPackagesResult
+$AllObjects += $AllDeploymentTypesResult
+
+$AllObjects | Export-Csv -Path "C:\users\ntcp85\Documents\$(get-date -format 'yyyyMMddHHmmss')-AllContentSourcePathData.csv" -NoTypeInformation
