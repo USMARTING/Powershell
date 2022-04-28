@@ -1,0 +1,1 @@
+get-cmcollection | select -ExpandProperty RefreshSchedule | select DayDuration,DaySpan,HourDuration,HourSpan,MinuteDuration,MinuteSpan | ConvertTo-Json -Compress | group
