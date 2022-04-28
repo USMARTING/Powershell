@@ -1,0 +1,45 @@
+$Collections = Get-CMCollection
+
+$Analysis = $Collections | Select @{n="CollectionName";e={$_.Name}},
+    @{n="CollectionRuleCount";e={
+        $_.CollectionRules.Count
+    }},
+    @{n="QueryRuleCount";e={
+        ($_.CollectionRules | Where-Object {$_.SmsProviderObjectPath -eq "SMS_CollectionRuleQuery"}).Count
+    }},
+    @{n="CollectionIncludeRuleCount";e={
+        ($_.CollectionRules | Where-Object {$_.SmsProviderObjectPath -eq "SMS_CollectionRuleIncludeCollection"}).Count
+    }},
+    @{n="CollectionExcludeRuleCount";e={
+        ($_.CollectionRules | Where-Object {$_.SmsProviderObjectPath -eq "SMS_CollectionRuleExcludeCollection"}).Count
+    }},
+    @{n="HasRecurringScheduledUpdates";e={
+        $_.Refreshschedule.SmsProviderObjectPath -ne "SMS_ST_NonRecurring"
+    }},
+    @{n="RecurringScheduledUpdateInterval";e={
+        $_.RefreshType -eq 2
+    }},
+    @{n="UsesIncrementalUpdates";e={
+        $_.RefreshType -eq 4
+    }},
+    @{n="QueryRuleData";e={
+        $_.CollectionRules | Where-Object {$_.SmsProviderObjectPath -eq "SMS_CollectionRuleQuery"} | Select @{n="QueryRuleExpression";e={$_.QueryExpression}},
+            @{n="QueryRuleHasSelectFieldWildcard";e={
+                $_.QueryExpression -ilike "Select `*"
+            }},
+            @{n="QueryRuleFieldCount";e={
+                $_.QueryExpression.substring(0,$_.QueryExpression.IndexOf(" a ", [system.stringcomparison]::CurrentCultureIgnoreCase)).Split(",").count
+            }},
+            @{n="QueryRuleJoinCount";e={
+                ($_.QueryExpression | Select-String -Pattern " join " -AllMatches).Matches.Count
+            }},
+            @{n="QueryRuleSubSelectCount";e={
+                ($_.QueryExpression | Select-String -Pattern " in " -AllMatches).Matches.Count
+            }},
+            @{n="QueryRuleWhereClauseLength";e={
+                ($_.QueryExpression.length - $_.QueryExpression.Indexof(" Where "))
+            }},
+            @{n="QueryRuleAndOrCount";e={
+                ($_.QueryExpression | Select-String -Pattern " and " -AllMatches).Matches.Count + ($_.QueryExpression | Select-String -Pattern " or " -AllMatches).Matches.Count
+            }}
+    }}
